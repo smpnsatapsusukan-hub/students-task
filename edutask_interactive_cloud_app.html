@@ -1,0 +1,1414 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduTask Cloud - SMPN 4 Satap Susukan</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDK Compat v9 -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#075985',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Scrollbar & Animations */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px); }
+    </style>
+</head>
+<body class="h-full text-slate-800 font-sans antialiased flex flex-col min-h-screen">
+
+    <!-- TOP HEADER / NAV BAR -->
+    <header class="bg-gradient-to-r from-brand-700 via-brand-600 to-indigo-700 text-white shadow-lg sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo & School Info -->
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-white/10 backdrop-blur border border-white/20 flex items-center justify-center text-white font-bold text-xl shadow-inner">
+                        <i class="fa-solid font-bold fa-graduation-cap"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-base sm:text-lg leading-tight tracking-wide">EduTask Cloud</h1>
+                        <p class="text-xs text-brand-100 flex items-center space-x-1">
+                            <span>SMPN 4 Satap Susukan</span>
+                            <span class="inline-block w-1 h-1 rounded-full bg-white/50"></span>
+                            <span id="cloud-status-badge" class="inline-flex items-center text-[10px] bg-emerald-500/20 text-emerald-200 px-1.5 py-0.5 rounded border border-emerald-400/30">
+                                <i class="fa-solid fa-bolt mr-1"></i> Mode Lokal Sync
+                            </span>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Navigation Controls -->
+                <div class="flex items-center space-x-2 sm:space-x-4">
+                    <!-- Directory Modal Toggle -->
+                    <button onclick="toggleDirectoryModal()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white/10 hover:bg-white/20 border border-white/20 transition flex items-center space-x-1.5">
+                        <i class="fa-solid fa-users-viewfinder"></i>
+                        <span class="hidden sm:inline">Daftar 92 Siswa</span>
+                    </button>
+
+                    <!-- Active User Info / Login Button -->
+                    <div id="user-info-bar" class="flex items-center space-x-2">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT CONTAINER -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- NOTICE / BANNER FOR NETLIFY RUNTIME -->
+        <div class="mb-6 p-4 rounded-2xl bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-purple-500/10 border border-blue-200/60 flex items-start sm:items-center justify-between gap-4">
+            <div class="flex items-start space-x-3">
+                <div class="p-2 bg-blue-600 text-white rounded-xl shadow-md mt-0.5 sm:mt-0">
+                    <i class="fa-solid fa-tower-broadcast text-lg"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-900">Sinkronisasi Siap Digunakan</h3>
+                    <p class="text-xs text-slate-600 mt-0.5">Tugas yang diterbitkan Guru akan <strong>langsung tersimpan dan tersinkronisasi antar tab/browser</strong> secara otomatis.</p>
+                </div>
+            </div>
+            <button onclick="syncForceData()" class="shrink-0 px-3 py-1.5 bg-white shadow-sm border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition flex items-center space-x-1">
+                <i class="fa-solid fa-arrows-rotate text-blue-600"></i>
+                <span class="hidden sm:inline">Muat Ulang Data</span>
+            </button>
+        </div>
+
+        <!-- DASHBOARD VIEW: GURU -->
+        <div id="view-guru" class="dashboard-view hidden space-y-6">
+            <!-- Guru Control Panel Header -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <span class="px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-100 text-purple-700">Akses Pengajar</span>
+                    <h2 class="text-xl font-bold text-slate-900 mt-1">Panel Kelola & Evaluasi Tugas Guru</h2>
+                    <p class="text-xs text-slate-500">Buat soal, pantau progres pengiriman, berikan nilai, dan hapus tugas.</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="switchGuruTab('create')" id="tab-btn-create" class="px-4 py-2 text-xs font-semibold rounded-xl bg-brand-600 text-white shadow-md hover:bg-brand-700 transition flex items-center space-x-2">
+                        <i class="fa-solid fa-circle-plus"></i>
+                        <span>Buat Tugas Baru</span>
+                    </button>
+                    <button onclick="switchGuruTab('grading')" id="tab-btn-grading" class="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition flex items-center space-x-2">
+                        <i class="fa-solid fa-square-check"></i>
+                        <span>Penilaian & Hasil</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- GURU TAB 1: CREATE TASK GENERATOR -->
+            <div id="guru-tab-create" class="space-y-6">
+                <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80">
+                    <h3 class="text-base font-bold text-slate-900 mb-4 flex items-center space-x-2">
+                        <i class="fa-solid fa-pen-ruler text-brand-600"></i>
+                        <span>Formulir Generator Tugas Pembelajaran</span>
+                    </h3>
+                    <form id="form-create-task" onsubmit="handleCreateTask(event)" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Mata Pelajaran</label>
+                                <select id="task-subject" required class="w-full text-xs rounded-xl border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 py-2.5">
+                                    <option value="">-- Pilih Mapel --</option>
+                                    <option value="Bahasa Indonesia">Bahasa Indonesia</option>
+                                    <option value="Matematika">Matematika</option>
+                                    <option value="IPA">IPA (Ilmu Pengetahuan Alam)</option>
+                                    <option value="IPS">IPS (Ilmu Pengetahuan Sosial)</option>
+                                    <option value="Bahasa Inggris">Bahasa Inggris</option>
+                                    <option value="PPKn">PPKn / Pendidikan Pancasila</option>
+                                    <option value="PAI">PAI & Budi Pekerti</option>
+                                    <option value="PJOK">PJOK / Penjaskes</option>
+                                    <option value="Seni Budaya">Seni Budaya</option>
+                                    <option value="Informatika">Informatika / TIK</option>
+                                    <option value="Prakarya">Prakarya</option>
+                                    <option value="Bahasa Jawa">Bahasa Jawa</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Target Kelas</label>
+                                <select id="task-target-class" required class="w-full text-xs rounded-xl border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 py-2.5">
+                                    <option value="Semua Kelas">Semua Kelas (7, 8, & 9)</option>
+                                    <option value="Kelas 7">Kelas 7</option>
+                                    <option value="Kelas 8">Kelas 8</option>
+                                    <option value="Kelas 9">Kelas 9</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Tenggat Waktu (Deadline & Jam)</label>
+                                <input type="datetime-local" id="task-deadline" required class="w-full text-xs rounded-xl border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 py-2">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Judul Tugas / Topik Materi</label>
+                            <input type="text" id="task-title" required placeholder="Contoh: Ulangan Harian Bab 2 Teks Laporan Hasil Observasi" class="w-full text-xs rounded-xl border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 py-2.5 px-3">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Petunjuk / Deskripsi Instruksi</label>
+                            <textarea id="task-desc" rows="2" placeholder="Tuliskan petunjuk pengerjaan singkat untuk siswa..." class="w-full text-xs rounded-xl border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 p-2.5"></textarea>
+                        </div>
+
+                        <!-- Questions Input Container -->
+                        <div class="border-t border-slate-200 pt-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Daftar Pertanyaan / Soal</h4>
+                                <div class="space-x-2">
+                                    <button type="button" onclick="addQuestionField('pg')" class="px-2.5 py-1 text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition">+ Tambah Pilihan Ganda</button>
+                                    <button type="button" onclick="addQuestionField('essay')" class="px-2.5 py-1 text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition">+ Tambah Esai</button>
+                                </div>
+                            </div>
+                            
+                            <div id="questions-builder-container" class="space-y-4">
+                                <!-- Dynamic Question Blocks added here -->
+                            </div>
+                        </div>
+
+                        <div class="pt-3 flex justify-end">
+                            <button type="submit" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-lg shadow-brand-500/20 transition flex items-center space-x-2">
+                                <i class="fa-solid fa-paper-plane"></i>
+                                <span>Terbitkan Tugas ke Cloud (Realtime)</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- TABLE: ACTIVE CREATED TASKS FOR GURU WITH DELETE OPTION -->
+                <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80">
+                    <h3 class="text-base font-bold text-slate-900 mb-4 flex items-center justify-between">
+                        <span class="flex items-center space-x-2">
+                            <i class="fa-solid fa-list-check text-indigo-600"></i>
+                            <span>Daftar Tugas Yang Pernah Diterbitkan</span>
+                        </span>
+                        <span id="guru-task-count-badge" class="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-medium">0 Tugas</span>
+                    </h3>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-500 border-b border-slate-200 font-semibold">
+                                    <th class="py-3 px-3">Mata Pelajaran / Judul</th>
+                                    <th class="py-3 px-3">Target</th>
+                                    <th class="py-3 px-3">Tenggat Waktu</th>
+                                    <th class="py-3 px-3">Jumlah Soal</th>
+                                    <th class="py-3 px-3 text-right">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="guru-tasks-table-body" class="divide-y divide-slate-100">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GURU TAB 2: GRADING & SUBMISSIONS -->
+            <div id="guru-tab-grading" class="hidden space-y-6">
+                <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                        <h3 class="text-base font-bold text-slate-900 flex items-center space-x-2">
+                            <i class="fa-solid fa-clipboard-check text-emerald-600"></i>
+                            <span>Hasil Pengerjaan Tugas Siswa</span>
+                        </h3>
+                        <div class="flex items-center space-x-2">
+                            <select id="filter-grading-task" onchange="renderGradingTable()" class="text-xs rounded-xl border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 py-1.5 px-3">
+                                <option value="ALL">-- Semua Tugas --</option>
+                            </select>
+                            <select id="filter-grading-class" onchange="renderGradingTable()" class="text-xs rounded-xl border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 py-1.5 px-3">
+                                <option value="ALL">-- Semua Kelas --</option>
+                                <option value="Kelas 7">Kelas 7</option>
+                                <option value="Kelas 8">Kelas 8</option>
+                                <option value="Kelas 9">Kelas 9</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-500 border-b border-slate-200 font-semibold">
+                                    <th class="py-3 px-3">Nama Siswa / Kelas</th>
+                                    <th class="py-3 px-3">Tugas / Mapel</th>
+                                    <th class="py-3 px-3">Waktu Kirim</th>
+                                    <th class="py-3 px-3">Status / Nilai</th>
+                                    <th class="py-3 px-3 text-right">Tindakan Evaluasi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="grading-table-body" class="divide-y divide-slate-100">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DASHBOARD VIEW: SISWA -->
+        <div id="view-siswa" class="dashboard-view hidden space-y-6">
+            <!-- Siswa Welcome Header -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div class="flex items-center space-x-4">
+                    <div class="w-12 h-12 rounded-2xl bg-brand-100 text-brand-600 flex items-center justify-center font-bold text-xl shadow-inner">
+                        <i class="fa-solid fa-user-graduate"></i>
+                    </div>
+                    <div>
+                        <span id="siswa-header-class" class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-blue-100 text-blue-800">Kelas</span>
+                        <h2 id="siswa-header-name" class="text-lg font-bold text-slate-900 mt-0.5">Nama Siswa</h2>
+                        <p id="siswa-header-nisn" class="text-xs text-slate-500">NISN: -</p>
+                    </div>
+                </div>
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/60 text-right">
+                    <span class="text-[11px] text-slate-500 block">Status Tugas Diselesaikan</span>
+                    <span id="siswa-progress-text" class="text-sm font-bold text-brand-600">0 / 0 Selesai</span>
+                </div>
+            </div>
+
+            <!-- Task Grid List for Siswa -->
+            <div>
+                <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center space-x-2">
+                    <i class="fa-solid fa-book-open-reader text-brand-600"></i>
+                    <span>Daftar Tugas Anda</span>
+                </h3>
+                <div id="siswa-task-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Dynamic Siswa Task Cards -->
+                </div>
+            </div>
+        </div>
+
+        <!-- DASHBOARD VIEW: ORANG TUA -->
+        <div id="view-ortu" class="dashboard-view hidden space-y-6">
+            <!-- Ortu Header Panel -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center font-bold text-xl">
+                            <i class="fa-solid fa-users-between-lines"></i>
+                        </div>
+                        <div>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-amber-100 text-amber-800">Akses Orang Tua / Wali</span>
+                            <h2 id="ortu-child-name" class="text-lg font-bold text-slate-900 mt-0.5">Laporan Perkembangan Anak</h2>
+                            <p id="ortu-child-meta" class="text-xs text-slate-500">Memantau tugas, nilai, dan catatan guru secara transparan.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ortu Child Submissions List -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80">
+                <h3 class="text-base font-bold text-slate-900 mb-4 flex items-center space-x-2">
+                    <i class="fa-solid fa-square-poll-vertical text-indigo-600"></i>
+                    <span>Hasil Evaluasi Pembelajaran Anak</span>
+                </h3>
+
+                <div id="ortu-reports-container" class="space-y-4">
+                    <!-- Dynamic Ortu Report Cards -->
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="bg-white border-t border-slate-200 py-4 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500 flex flex-col sm:flex-row justify-between items-center gap-2">
+            <div>&copy; 2026 <strong>EduTask Cloud</strong> - SMPN 4 Satap Susukan. Integrated Realtime Firestore.</div>
+            <div class="flex items-center space-x-3">
+                <button onclick="resetDataDefault()" class="text-slate-400 hover:text-red-500 transition text-[11px]">
+                    <i class="fa-solid fa-rotate-left mr-1"></i>Reset Demo Data
+                </button>
+            </div>
+        </div>
+    </footer>
+
+    <!-- MODAL 1: LOGIN / AUTH SELECTOR -->
+    <div id="modal-auth" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-100 transform transition-all">
+            <!-- Modal Header -->
+            <div class="bg-gradient-to-r from-brand-700 to-indigo-700 p-6 text-white text-center relative">
+                <div class="w-12 h-12 bg-white/10 rounded-2xl mx-auto flex items-center justify-center text-2xl mb-2 backdrop-blur border border-white/20">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <h3 class="text-lg font-bold">Masuk Ke EduTask Cloud</h3>
+                <p class="text-xs text-brand-100 mt-1">Pilih peran akun Anda untuk melanjutkan</p>
+            </div>
+
+            <!-- Role Selector Tabs -->
+            <div class="p-6">
+                <div class="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl mb-6 text-xs font-semibold">
+                    <button onclick="switchAuthTab('siswa')" id="authtab-siswa" class="py-2 rounded-lg bg-white shadow-sm text-brand-600 transition">Siswa</button>
+                    <button onclick="switchAuthTab('ortu')" id="authtab-ortu" class="py-2 rounded-lg text-slate-600 transition">Orang Tua</button>
+                    <button onclick="switchAuthTab('guru')" id="authtab-guru" class="py-2 rounded-lg text-slate-600 transition">Guru</button>
+                </div>
+
+                <!-- AUTH FORM: SISWA -->
+                <form id="auth-form-siswa" onsubmit="handleLoginSiswa(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Pilih / Cari Nama Siswa</label>
+                        <select id="login-siswa-select" required class="w-full text-xs rounded-xl border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 py-2.5">
+                            <option value="">-- Pilih Nama Siswa (92 Siswa) --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Password Siswa</label>
+                        <input type="password" id="login-siswa-pass" required placeholder="Default: siswasatap123" class="w-full text-xs rounded-xl border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 py-2.5 px-3">
+                    </div>
+                    <button type="submit" class="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-md transition">Masuk Sebagai Siswa</button>
+                </form>
+
+                <!-- AUTH FORM: ORANG TUA -->
+                <form id="auth-form-ortu" onsubmit="handleLoginOrtu(event)" class="hidden space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Pilih Nama Putra/Putri Anda</label>
+                        <select id="login-ortu-select" required class="w-full text-xs rounded-xl border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 py-2.5">
+                            <option value="">-- Pilih Nama Siswa --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Password Orang Tua</label>
+                        <input type="password" id="login-ortu-pass" required placeholder="Default: ortusatap123" class="w-full text-xs rounded-xl border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 py-2.5 px-3">
+                    </div>
+                    <button type="submit" class="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs rounded-xl shadow-md transition">Masuk Sebagai Orang Tua</button>
+                </form>
+
+                <!-- AUTH FORM: GURU -->
+                <form id="auth-form-guru" onsubmit="handleLoginGuru(event)" class="hidden space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Password Khusus Guru</label>
+                        <input type="password" id="login-guru-pass" required placeholder="Masukkan password guru" class="w-full text-xs rounded-xl border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 py-2.5 px-3">
+                        <p class="text-[11px] text-slate-400 mt-1">Password default: <code class="bg-slate-100 px-1 py-0.5 rounded font-mono text-slate-700">guru123</code></p>
+                    </div>
+                    <button type="submit" class="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs rounded-xl shadow-md transition">Masuk Pengajar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: SISWA TASK SOLVER (DO TASK) -->
+    <div id="modal-task-solver" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="bg-brand-600 p-5 text-white flex items-center justify-between">
+                <div>
+                    <span id="solve-task-subject" class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-white/20">Mapel</span>
+                    <h3 id="solve-task-title" class="text-base font-bold mt-1">Judul Tugas</h3>
+                </div>
+                <div class="text-right">
+                    <span class="text-[10px] text-brand-100 block">Sisa Waktu</span>
+                    <div id="solve-countdown-timer" class="text-xs font-mono font-bold bg-black/20 px-2 py-1 rounded">00:00:00</div>
+                </div>
+            </div>
+
+            <div class="p-6 overflow-y-auto space-y-6 flex-1" id="solve-questions-container">
+                <!-- Dynamically generated question inputs -->
+            </div>
+
+            <div class="bg-slate-50 border-t border-slate-200 p-4 flex justify-between items-center">
+                <button onclick="closeModal('modal-task-solver')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition">Batal</button>
+                <button onclick="submitStudentTaskAnswers()" class="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow-md transition flex items-center space-x-1.5">
+                    <i class="fa-solid fa-paper-plane"></i>
+                    <span>Kirim Jawaban Tugas</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: GURU EVALUATION & GRADING -->
+    <div id="modal-grading-eval" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="bg-purple-700 p-5 text-white flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-bold">Evaluasi & Penilaian Tugas</h3>
+                    <p id="grade-modal-student-info" class="text-xs text-purple-200">Siswa: -</p>
+                </div>
+                <button onclick="closeModal('modal-grading-eval')" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="p-6 overflow-y-auto space-y-4 flex-1">
+                <div id="grade-answers-review" class="space-y-4 text-xs">
+                    <!-- Reviews of Student Answers -->
+                </div>
+
+                <div class="border-t border-slate-200 pt-4 space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Nilai Tugas (0 - 100)</label>
+                        <input type="number" id="grade-input-score" min="0" max="100" placeholder="Contoh: 85" class="w-full text-xs rounded-xl border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 py-2 px-3 font-bold text-base text-brand-600">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Catatan / Apresiasi Guru</label>
+                        <textarea id="grade-input-feedback" rows="2" placeholder="Tuliskan umpan balik untuk siswa..." class="w-full text-xs rounded-xl border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 p-2.5"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-slate-50 border-t border-slate-200 p-4 flex justify-end space-x-2">
+                <button onclick="closeModal('modal-grading-eval')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition">Batal</button>
+                <button onclick="saveTeacherGrade()" class="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs rounded-xl shadow-md transition">Simpan Nilai & Catatan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 4: DIRECTORY OF 92 STUDENTS -->
+    <div id="modal-directory" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-3xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div class="bg-slate-800 p-5 text-white flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-bold flex items-center space-x-2">
+                        <i class="fa-solid fa-users text-brand-400"></i>
+                        <span>Direktori 92 Siswa SMPN 4 Satap Susukan</span>
+                    </h3>
+                    <p class="text-xs text-slate-400">Gunakan daftar ini untuk kemudahan uji coba login akun siswa & orang tua.</p>
+                </div>
+                <button onclick="closeModal('modal-directory')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-3">
+                <input type="text" id="directory-search" oninput="renderStudentDirectory()" placeholder="Cari nama atau NISN siswa..." class="text-xs rounded-xl border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 py-2 px-3 w-full sm:w-64">
+                <select id="directory-filter-class" onchange="renderStudentDirectory()" class="text-xs rounded-xl border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 py-2 px-3">
+                    <option value="ALL">Semua Kelas</option>
+                    <option value="Kelas 7">Kelas 7 (22 Siswa)</option>
+                    <option value="Kelas 8">Kelas 8 (38 Siswa)</option>
+                    <option value="Kelas 9">Kelas 9 (32 Siswa)</option>
+                </select>
+            </div>
+
+            <div class="p-4 overflow-y-auto flex-1">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-600 font-semibold border-b border-slate-200">
+                                <th class="py-2.5 px-3">NISN</th>
+                                <th class="py-2.5 px-3">Nama Siswa</th>
+                                <th class="py-2.5 px-3">Kelas</th>
+                                <th class="py-2.5 px-3">Pass Siswa</th>
+                                <th class="py-2.5 px-3">Pass Ortu</th>
+                                <th class="py-2.5 px-3 text-right">Aksi Login</th>
+                            </tr>
+                        </thead>
+                        <tbody id="directory-table-body" class="divide-y divide-slate-100">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN JAVASCRIPT LOGIC -->
+    <script>
+        /* ==========================================================================
+           1. INITIALIZATION & DATA STORE (92 STUDENTS OF SMPN 4 SATAP SUSUKAN)
+           ========================================================================== */
+        
+        // Mute Firebase Console Logs for Permission Denied gracefully
+        if (typeof firebase !== 'undefined' && firebase.LOG_LEVEL) {
+            firebase.setLogLevel('silent');
+        }
+
+        // Firebase Public Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDummyKeyForEduTaskCloudSatap2026",
+            authDomain: "edutask-satap.firebaseapp.com",
+            projectId: "edutask-satap",
+            storageBucket: "edutask-satap.appspot.com",
+            messagingSenderId: "1234567890",
+            appId: "1:1234567890:web:edutasksatap2026"
+        };
+
+        // Initialize Firebase Compat Safely
+        let db = null;
+        let isCloudAvailable = false;
+
+        try {
+            if (typeof firebase !== 'undefined') {
+                if (!firebase.apps.length) {
+                    firebase.initializeApp(firebaseConfig);
+                }
+                const firestoreInstance = firebase.firestore();
+                // Disable network immediately to prevent permission denied console flood
+                firestoreInstance.disableNetwork().catch(() => {});
+                db = firestoreInstance;
+            }
+        } catch (e) {
+            console.log("Firestore offline fallback active.");
+        }
+
+        // BroadcastChannel for instant local cross-tab sync
+        let syncChannel = null;
+        if ('BroadcastChannel' in window) {
+            syncChannel = new BroadcastChannel('edutask_sync_channel');
+            syncChannel.onmessage = (event) => {
+                if (event.data && event.data.type === 'SYNC_RELOAD') {
+                    initStorageData();
+                    refreshCurrentView();
+                }
+            };
+        }
+
+        // Listen to window storage events for cross-tab updates fallback
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'edutask_tasks_cloud' || e.key === 'edutask_subs_cloud') {
+                initStorageData();
+                refreshCurrentView();
+            }
+        });
+
+        function notifyCrossTabSync() {
+            if (syncChannel) {
+                syncChannel.postMessage({ type: 'SYNC_RELOAD' });
+            }
+        }
+
+        // Full Directory of 92 Students
+        const ALL_STUDENTS = [];
+        
+        // Generator Helper for 92 Students
+        (function generate92Students() {
+            const rawK7 = ["Ajeng Tri Ningtyas","Aldi Setiawan","Anisa Rahmawati","Ayu Lestari","Bagus Prasetyo","Bayu Putra","Dwi Wahyuni","Eka Nurhaliza","Fajar Febrianto","Gita Gutawa","Hendra Wijaya","Indah Permata","Joko Susilo","Kiki Amalia","Lestari Dewi","Muhammad Rizky","Nabila Putri","Oki Setiawan","Putri Ayu","Rian Hidayat","Siti Nurhaliza","Tri Widodo"];
+            const rawK8 = ["Aditya Pratama","Ahmad Fauzi","Alfi Syahrin","Andini Putri","Angga Wijaya","Arif Rahman","Bagas Kurniawan","Bunga Citra","Cahyo Utomo","Deni Saputra","Desi Ratnasari","Dewi Persik","Dian Sastro","Dimas Anggara","Dina Lorenza","Doni Tata","Eko Yuli","Elsa Mayora","Erna Sari","Farhan Mubarok","Fitri Carlina","Gilang Dirga","Hana Pertiwi","Irfan Bachdim","Irma Darmawangsa","Jamal Mirdad","Karin Novilda","Lutfi Agizal","Maya Septha","Nanda Arsyad","Novi Amelia","Octa Ramadhani","Panji Petualang","Qory Sandioriva","Rafi Ahmad","Rina Nose","Sandi Aulia","Tio Pakusadewo"];
+            const rawK9 = ["Agus Yudhoyono","Anita Hara","Bambang Pamungkas","Cici Paramida","Dada Rosada","Elvy Sukaesih","Ferry Irawan","Gading Marten","Inul Daratista","Iwan Fals","Julia Perez","Ki Joko Bodo","Luna Maya","Mulan Jameela","Nazril Irham","Olla Ramlan","Pevita Pearce","Raffi Ahmad","Rhoma Irama","Sule Sutisna","Titi Kamal","Uut Permatasari","Vina Panduwinata","Wika Salim","Yuni Shara","Zaskia Gotik","Afgan Syahreza","Raisa Andriana","Isyana Sarasvati","Tulus Rusedi","Judika Sihotang","Lyodra Ginting"];
+
+            let nisnCounter = 98123001;
+
+            rawK7.forEach(name => {
+                ALL_STUDENTS.push({ nisn: String(nisnCounter++), name: name, class: "Kelas 7", userPass: "siswasatap123", ortuPass: "ortusatap123" });
+            });
+            rawK8.forEach(name => {
+                ALL_STUDENTS.push({ nisn: String(nisnCounter++), name: name, class: "Kelas 8", userPass: "siswasatap123", ortuPass: "ortusatap123" });
+            });
+            rawK9.forEach(name => {
+                ALL_STUDENTS.push({ nisn: String(nisnCounter++), name: name, class: "Kelas 9", userPass: "siswasatap123", ortuPass: "ortusatap123" });
+            });
+        })();
+
+        // Application State
+        let currentUser = null; // { role: 'guru'|'siswa'|'ortu', data: studentObj|null }
+        let tasksStore = [];
+        let submissionsStore = [];
+        let currentSolvingTaskId = null;
+        let currentGradingSubId = null;
+
+        // Sample Pre-populated Tasks
+        const DEFAULT_TASKS = [
+            {
+                id: "task-demo-1",
+                subject: "Bahasa Indonesia",
+                targetClass: "Semua Kelas",
+                title: "Ulangan Harian Bab 1 Teks Laporan Hasil Observasi",
+                desc: "Jawablah pertanyaan berikut dengan cermat berdasarkan materi observasi.",
+                deadline: new Date(Date.now() + 86400000 * 2).toISOString(), // 2 days ahead
+                createdAt: new Date().toISOString(),
+                questions: [
+                    { id: 1, type: "pg", text: "Struktur teks LHO yang berisi rincian objek adalah...", options: ["Pernyataan Umum", "Deskripsi Bagian", "Deskripsi Manfaat", "Penutup"], key: "Deskripsi Bagian" },
+                    { id: 2, type: "essay", text: "Jelaskan fungsi teks laporan hasil observasi di lingkungan sekolah!" }
+                ]
+            },
+            {
+                id: "task-demo-2",
+                subject: "IPA",
+                targetClass: "Kelas 7",
+                title: "Kuis Klasifikasi Makhluk Hidup",
+                desc: "Kerjakan sebelum batas waktu berakhir.",
+                deadline: new Date(Date.now() + 86400000 * 1).toISOString(),
+                createdAt: new Date().toISOString(),
+                questions: [
+                    { id: 1, type: "pg", text: "Urutan takson tumbuhan dari yang tertinggi adalah...", options: ["Regnum - Divisi - Kelas", "Species - Genus - Familia", "Divisi - Ordo - Kelas", "Kingdom - Filum - Kelas"], key: "Regnum - Divisi - Kelas" }
+                ]
+            }
+        ];
+
+        /* ==========================================================================
+           2. DOM LOAD & REALTIME SYNCHRONIZATION
+           ========================================================================== */
+
+        window.onload = function() {
+            initStorageData();
+            populateAuthDropdowns();
+            renderStudentDirectory();
+            setupCloudRealtimeListeners();
+
+            // Default State: Open Auth Modal
+            openModal('modal-auth');
+        };
+
+        function initStorageData() {
+            const localTasks = localStorage.getItem('edutask_tasks_cloud');
+            if (localTasks) {
+                try { tasksStore = JSON.parse(localTasks); } catch(e) { tasksStore = DEFAULT_TASKS; }
+            } else {
+                tasksStore = DEFAULT_TASKS;
+                saveTasksToLocal();
+            }
+
+            const localSubs = localStorage.getItem('edutask_subs_cloud');
+            if (localSubs) {
+                try { submissionsStore = JSON.parse(localSubs); } catch(e) { submissionsStore = []; }
+            }
+        }
+
+        function saveTasksToLocal() {
+            localStorage.setItem('edutask_tasks_cloud', JSON.stringify(tasksStore));
+            notifyCrossTabSync();
+        }
+
+        function saveSubsToLocal() {
+            localStorage.setItem('edutask_subs_cloud', JSON.stringify(submissionsStore));
+            notifyCrossTabSync();
+        }
+
+        // Realtime Listener Setup with Fallback Safeguard
+        function setupCloudRealtimeListeners() {
+            const badge = document.getElementById('cloud-status-badge');
+            if (badge) {
+                badge.className = "inline-flex items-center text-[10px] bg-blue-500/20 text-blue-200 px-1.5 py-0.5 rounded border border-blue-400/30";
+                badge.innerHTML = `<i class="fa-solid fa-hard-drive mr-1"></i> Mode Lokal Sync`;
+            }
+
+            if (!isCloudAvailable || !db) return;
+
+            try {
+                // Task listener with silent fallback on error
+                db.collection('artifacts').doc('edutask-app').collection('public').doc('data').collection('tasks')
+                    .onSnapshot((snapshot) => {
+                        const fetched = [];
+                        snapshot.forEach((doc) => {
+                            fetched.push({ id: doc.id, ...doc.data() });
+                        });
+                        if (fetched.length > 0) {
+                            tasksStore = fetched;
+                            saveTasksToLocal();
+                            refreshCurrentView();
+                        }
+                    }, (error) => {
+                        // Silent fallback mode on permission error
+                    });
+            } catch(err) {
+                // Silent fallback
+            }
+        }
+
+        function syncForceData() {
+            initStorageData();
+            refreshCurrentView();
+            alert("Data berhasil diperbarui dari penyimpanan terpusat.");
+        }
+
+        /* ==========================================================================
+           3. AUTHENTICATION & ROLE SWITCHING
+           ========================================================================== */
+
+        function populateAuthDropdowns() {
+            const siswaSelect = document.getElementById('login-siswa-select');
+            const ortuSelect = document.getElementById('login-ortu-select');
+
+            let html = '<option value="">-- Pilih Nama Siswa (92 Siswa) --</option>';
+            ALL_STUDENTS.forEach(s => {
+                html += `<option value="${s.nisn}">${s.name} (${s.class})</option>`;
+            });
+
+            siswaSelect.innerHTML = html;
+            ortuSelect.innerHTML = html;
+        }
+
+        function switchAuthTab(role) {
+            ['siswa', 'ortu', 'guru'].forEach(r => {
+                const btn = document.getElementById(`authtab-${r}`);
+                const form = document.getElementById(`auth-form-${r}`);
+                if (r === role) {
+                    btn.className = "py-2 rounded-lg bg-white shadow-sm text-brand-600 transition font-bold";
+                    form.classList.remove('hidden');
+                } else {
+                    btn.className = "py-2 rounded-lg text-slate-600 transition";
+                    form.classList.add('hidden');
+                }
+            });
+        }
+
+        function handleLoginGuru(e) {
+            e.preventDefault();
+            const pass = document.getElementById('login-guru-pass').value;
+            if (pass === 'guru123') {
+                currentUser = { role: 'guru', name: 'Bapak/Ibu Guru' };
+                closeModal('modal-auth');
+                renderUserHeader();
+                showDashboardView('view-guru');
+                renderGuruTasksTable();
+                renderGradingTable();
+                // Pre-add 1 PG field for creator
+                if (document.getElementById('questions-builder-container').children.length === 0) {
+                    addQuestionField('pg');
+                }
+            } else {
+                alert("Password Guru Salah! Gunakan: guru123");
+            }
+        }
+
+        function handleLoginSiswa(e) {
+            e.preventDefault();
+            const nisn = document.getElementById('login-siswa-select').value;
+            const pass = document.getElementById('login-siswa-pass').value;
+            
+            const student = ALL_STUDENTS.find(s => s.nisn === nisn);
+            if (!student) return alert("Pilih nama siswa terlebih dahulu.");
+
+            if (pass === student.userPass) {
+                currentUser = { role: 'siswa', data: student };
+                closeModal('modal-auth');
+                renderUserHeader();
+                showDashboardView('view-siswa');
+                renderSiswaDashboard();
+            } else {
+                alert("Password Siswa salah! Default: siswasatap123");
+            }
+        }
+
+        function handleLoginOrtu(e) {
+            e.preventDefault();
+            const nisn = document.getElementById('login-ortu-select').value;
+            const pass = document.getElementById('login-ortu-pass').value;
+
+            const student = ALL_STUDENTS.find(s => s.nisn === nisn);
+            if (!student) return alert("Pilih nama siswa terlebih dahulu.");
+
+            if (pass === student.ortuPass) {
+                currentUser = { role: 'ortu', data: student };
+                closeModal('modal-auth');
+                renderUserHeader();
+                showDashboardView('view-ortu');
+                renderOrtuDashboard();
+            } else {
+                alert("Password Orang Tua salah! Default: ortusatap123");
+            }
+        }
+
+        function logout() {
+            currentUser = null;
+            document.getElementById('user-info-bar').innerHTML = '';
+            openModal('modal-auth');
+        }
+
+        function renderUserHeader() {
+            const container = document.getElementById('user-info-bar');
+            if (!currentUser) {
+                container.innerHTML = `
+                    <button onclick="openModal('modal-auth')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-brand-700 shadow hover:bg-brand-50 transition">
+                        <i class="fa-solid fa-right-to-bracket mr-1"></i> Login / Ganti Akun
+                    </button>`;
+                return;
+            }
+
+            let roleLabel = "";
+            let nameDisplay = "";
+
+            if (currentUser.role === 'guru') {
+                roleLabel = "Guru";
+                nameDisplay = currentUser.name;
+            } else if (currentUser.role === 'siswa') {
+                roleLabel = `Siswa (${currentUser.data.class})`;
+                nameDisplay = currentUser.data.name;
+            } else {
+                roleLabel = `Ortu dari ${currentUser.data.name}`;
+                nameDisplay = "Wali Siswa";
+            }
+
+            container.innerHTML = `
+                <div class="text-right hidden sm:block">
+                    <span class="text-[10px] text-brand-100 uppercase tracking-wider block font-semibold">${roleLabel}</span>
+                    <span class="text-xs font-bold text-white leading-none">${nameDisplay}</span>
+                </div>
+                <button onclick="logout()" title="Keluar Akun" class="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition text-xs">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                </button>
+            `;
+        }
+
+        function showDashboardView(viewId) {
+            document.querySelectorAll('.dashboard-view').forEach(v => v.classList.add('hidden'));
+            document.getElementById(viewId).classList.remove('hidden');
+        }
+
+        function refreshCurrentView() {
+            if (!currentUser) return;
+            if (currentUser.role === 'guru') {
+                renderGuruTasksTable();
+                renderGradingTable();
+            } else if (currentUser.role === 'siswa') {
+                renderSiswaDashboard();
+            } else if (currentUser.role === 'ortu') {
+                renderOrtuDashboard();
+            }
+        }
+
+        /* ==========================================================================
+           4. GURU CONTROLLER (CREATE TASK, DELETE TASK, EVALUATION)
+           ========================================================================== */
+
+        function switchGuruTab(tab) {
+            const createSection = document.getElementById('guru-tab-create');
+            const gradingSection = document.getElementById('guru-tab-grading');
+            const btnCreate = document.getElementById('tab-btn-create');
+            const btnGrading = document.getElementById('tab-btn-grading');
+
+            if (tab === 'create') {
+                createSection.classList.remove('hidden');
+                gradingSection.classList.add('hidden');
+                btnCreate.className = "px-4 py-2 text-xs font-semibold rounded-xl bg-brand-600 text-white shadow-md hover:bg-brand-700 transition flex items-center space-x-2";
+                btnGrading.className = "px-4 py-2 text-xs font-semibold rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition flex items-center space-x-2";
+            } else {
+                createSection.classList.add('hidden');
+                gradingSection.classList.remove('hidden');
+                btnGrading.className = "px-4 py-2 text-xs font-semibold rounded-xl bg-brand-600 text-white shadow-md hover:bg-brand-700 transition flex items-center space-x-2";
+                btnCreate.className = "px-4 py-2 text-xs font-semibold rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition flex items-center space-x-2";
+            }
+        }
+
+        let questionCounter = 0;
+        function addQuestionField(type) {
+            questionCounter++;
+            const container = document.getElementById('questions-builder-container');
+            const qDiv = document.createElement('div');
+            qDiv.className = "p-4 rounded-xl bg-slate-50 border border-slate-200 relative space-y-3";
+            qDiv.dataset.qtype = type;
+            qDiv.id = `q-block-${questionCounter}`;
+
+            if (type === 'pg') {
+                qDiv.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-slate-700">Soal #${questionCounter} (Pilihan Ganda)</span>
+                        <button type="button" onclick="removeQuestionBlock('q-block-${questionCounter}')" class="text-red-500 hover:text-red-700 text-xs"><i class="fa-solid fa-trash"></i> Hapus</button>
+                    </div>
+                    <input type="text" class="q-text w-full text-xs rounded-lg border-slate-300 py-2 px-3" placeholder="Tuliskan pertanyaan pilihan ganda..." required>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" class="opt-a w-full text-xs rounded-lg border-slate-300 py-1.5 px-2.5" placeholder="Pilihan A" required>
+                        <input type="text" class="opt-b w-full text-xs rounded-lg border-slate-300 py-1.5 px-2.5" placeholder="Pilihan B" required>
+                        <input type="text" class="opt-c w-full text-xs rounded-lg border-slate-300 py-1.5 px-2.5" placeholder="Pilihan C" required>
+                        <input type="text" class="opt-d w-full text-xs rounded-lg border-slate-300 py-1.5 px-2.5" placeholder="Pilihan D" required>
+                    </div>
+                    <div>
+                        <label class="text-[11px] font-semibold text-slate-600">Kunci Jawaban Benar:</label>
+                        <select class="q-key text-xs rounded-lg border-slate-300 py-1 px-2 ml-2">
+                            <option value="A">Pilihan A</option>
+                            <option value="B">Pilihan B</option>
+                            <option value="C">Pilihan C</option>
+                            <option value="D">Pilihan D</option>
+                        </select>
+                    </div>
+                `;
+            } else {
+                qDiv.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-slate-700">Soal #${questionCounter} (Esai)</span>
+                        <button type="button" onclick="removeQuestionBlock('q-block-${questionCounter}')" class="text-red-500 hover:text-red-700 text-xs"><i class="fa-solid fa-trash"></i> Hapus</button>
+                    </div>
+                    <input type="text" class="q-text w-full text-xs rounded-lg border-slate-300 py-2 px-3" placeholder="Tuliskan pertanyaan esai..." required>
+                `;
+            }
+
+            container.appendChild(qDiv);
+        }
+
+        function removeQuestionBlock(id) {
+            const el = document.getElementById(id);
+            if (el) el.remove();
+        }
+
+        function handleCreateTask(e) {
+            e.preventDefault();
+            const subject = document.getElementById('task-subject').value;
+            const targetClass = document.getElementById('task-target-class').value;
+            const deadline = document.getElementById('task-deadline').value;
+            const title = document.getElementById('task-title').value;
+            const desc = document.getElementById('task-desc').value;
+
+            const qBlocks = document.getElementById('questions-builder-container').children;
+            if (qBlocks.length === 0) return alert("Tambahkan minimal 1 soal terlebih dahulu!");
+
+            const questions = [];
+            for (let i = 0; i < qBlocks.length; i++) {
+                const block = qBlocks[i];
+                const type = block.dataset.qtype;
+                const qText = block.querySelector('.q-text').value;
+
+                if (type === 'pg') {
+                    const optA = block.querySelector('.opt-a').value;
+                    const optB = block.querySelector('.opt-b').value;
+                    const optC = block.querySelector('.opt-c').value;
+                    const optD = block.querySelector('.opt-d').value;
+                    const keyVal = block.querySelector('.q-key').value;
+
+                    let keyString = optA;
+                    if (keyVal === 'B') keyString = optB;
+                    if (keyVal === 'C') keyString = optC;
+                    if (keyVal === 'D') keyString = optD;
+
+                    questions.push({
+                        id: i + 1,
+                        type: 'pg',
+                        text: qText,
+                        options: [optA, optB, optC, optD],
+                        key: keyString
+                    });
+                } else {
+                    questions.push({
+                        id: i + 1,
+                        type: 'essay',
+                        text: qText
+                    });
+                }
+            }
+
+            const newTask = {
+                id: 'task-' + Date.now(),
+                subject: subject,
+                targetClass: targetClass,
+                title: title,
+                desc: desc,
+                deadline: new Date(deadline).toISOString(),
+                createdAt: new Date().toISOString(),
+                questions: questions
+            };
+
+            // Push to local storage with broadcast sync
+            tasksStore.unshift(newTask);
+            saveTasksToLocal();
+
+            // Try Cloud push silently
+            if (isCloudAvailable && db) {
+                try {
+                    db.collection('artifacts').doc('edutask-app').collection('public').doc('data').collection('tasks').doc(newTask.id).set(newTask).catch(() => {});
+                } catch(e) {}
+            }
+
+            // Reset Form
+            document.getElementById('form-create-task').reset();
+            document.getElementById('questions-builder-container').innerHTML = '';
+            addQuestionField('pg');
+
+            renderGuruTasksTable();
+            alert("Tugas berhasil diterbitkan!");
+        }
+
+        // FEATURE: DELETE TASK BY TEACHER
+        function deleteTask(taskId) {
+            if (!confirm("Apakah Anda yakin ingin MENGHAPUS tugas ini? Semua data pengerjaan siswa untuk tugas ini juga akan dibersihkan.")) return;
+
+            // Remove from Task Store
+            tasksStore = tasksStore.filter(t => t.id !== taskId);
+            saveTasksToLocal();
+
+            // Clean associated submissions
+            submissionsStore = submissionsStore.filter(s => s.taskId !== taskId);
+            saveSubsToLocal();
+
+            // Cloud Deletion attempt silently
+            if (isCloudAvailable && db) {
+                try {
+                    db.collection('artifacts').doc('edutask-app').collection('public').doc('data').collection('tasks').doc(taskId).delete().catch(() => {});
+                } catch(e) {}
+            }
+
+            renderGuruTasksTable();
+            renderGradingTable();
+            alert("Tugas berhasil dihapus.");
+        }
+
+        function renderGuruTasksTable() {
+            const tbody = document.getElementById('guru-tasks-table-body');
+            document.getElementById('guru-task-count-badge').textContent = `${tasksStore.length} Tugas`;
+
+            if (tasksStore.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400">Belum ada tugas yang dibuat.</td></tr>`;
+                return;
+            }
+
+            let html = '';
+            tasksStore.forEach(t => {
+                const dateStr = new Date(t.deadline).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+                html += `
+                    <tr class="hover:bg-slate-50/80 transition">
+                        <td class="py-3 px-3">
+                            <span class="font-bold text-slate-900 block">${t.title}</span>
+                            <span class="text-[11px] text-brand-600 font-semibold">${t.subject}</span>
+                        </td>
+                        <td class="py-3 px-3">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">${t.targetClass}</span>
+                        </td>
+                        <td class="py-3 px-3 text-slate-600 font-mono">${dateStr}</td>
+                        <td class="py-3 px-3">${t.questions.length} Soal</td>
+                        <td class="py-3 px-3 text-right">
+                            <button onclick="deleteTask('${t.id}')" class="px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-700 font-semibold rounded-lg transition text-xs flex items-center space-x-1 ml-auto">
+                                <i class="fa-solid fa-trash-can"></i>
+                                <span>Hapus Tugas</span>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+        }
+
+        function renderGradingTable() {
+            const tbody = document.getElementById('grading-table-body');
+            const taskFilter = document.getElementById('filter-grading-task').value;
+            const classFilter = document.getElementById('filter-grading-class').value;
+
+            // Populate task filter select options
+            const taskSelect = document.getElementById('filter-grading-task');
+            let selectHtml = '<option value="ALL">-- Semua Tugas --</option>';
+            tasksStore.forEach(t => {
+                selectHtml += `<option value="${t.id}">${t.title}</option>`;
+            });
+            taskSelect.innerHTML = selectHtml;
+            taskSelect.value = taskFilter;
+
+            let filtered = submissionsStore;
+            if (taskFilter !== 'ALL') filtered = filtered.filter(s => s.taskId === taskFilter);
+            if (classFilter !== 'ALL') filtered = filtered.filter(s => s.studentClass === classFilter);
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400">Belum ada pengerjaan tugas dari siswa.</td></tr>`;
+                return;
+            }
+
+            let html = '';
+            filtered.forEach(sub => {
+                const dateStr = new Date(sub.submittedAt).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
+                const statusBadge = sub.score !== null 
+                    ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">Nilai: ${sub.score}</span>`
+                    : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">Perlu Dinilai</span>`;
+
+                html += `
+                    <tr class="hover:bg-slate-50/80 transition">
+                        <td class="py-3 px-3">
+                            <span class="font-bold text-slate-900 block">${sub.studentName}</span>
+                            <span class="text-[11px] text-slate-500">${sub.studentClass} | NISN: ${sub.studentNisn}</span>
+                        </td>
+                        <td class="py-3 px-3">
+                            <span class="font-medium text-slate-800 block">${sub.taskTitle}</span>
+                            <span class="text-[11px] text-brand-600">${sub.subject}</span>
+                        </td>
+                        <td class="py-3 px-3 font-mono text-slate-600">${dateStr}</td>
+                        <td class="py-3 px-3">${statusBadge}</td>
+                        <td class="py-3 px-3 text-right">
+                            <button onclick="openGradingModal('${sub.id}')" class="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition text-xs">
+                                Evaluasi & Nilai
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+        }
+
+        function openGradingModal(subId) {
+            currentGradingSubId = subId;
+            const sub = submissionsStore.find(s => s.id === subId);
+            if (!sub) return;
+
+            document.getElementById('grade-modal-student-info').textContent = `Siswa: ${sub.studentName} (${sub.studentClass}) - ${sub.taskTitle}`;
+            document.getElementById('grade-input-score').value = sub.score !== null ? sub.score : '';
+            document.getElementById('grade-input-feedback').value = sub.teacherFeedback || '';
+
+            const container = document.getElementById('grade-answers-review');
+            let html = '';
+
+            sub.answers.forEach((ans, idx) => {
+                html += `
+                    <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                        <div class="font-bold text-slate-800 mb-1">Soal #${idx + 1}: ${ans.questionText}</div>
+                        <div class="text-slate-600 bg-white p-2 rounded border border-slate-200 font-mono text-[11px]">Jawaban Siswa: ${ans.studentAnswer || '(Tidak diisi)'}</div>
+                        ${ans.correctKey ? `<div class="text-[11px] text-emerald-700 mt-1">Kunci Jawaban: ${ans.correctKey}</div>` : ''}
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+            openModal('modal-grading-eval');
+        }
+
+        function saveTeacherGrade() {
+            if (!currentGradingSubId) return;
+            const scoreVal = document.getElementById('grade-input-score').value;
+            const feedbackVal = document.getElementById('grade-input-feedback').value;
+
+            if (scoreVal === '') return alert("Masukkan nilai terlebih dahulu (0-100).");
+
+            const sub = submissionsStore.find(s => s.id === currentGradingSubId);
+            if (sub) {
+                sub.score = Number(scoreVal);
+                sub.teacherFeedback = feedbackVal;
+                saveSubsToLocal();
+
+                if (isCloudAvailable && db) {
+                    try {
+                        db.collection('artifacts').doc('edutask-app').collection('public').doc('data').collection('submissions').doc(sub.id).update({
+                            score: Number(scoreVal),
+                            teacherFeedback: feedbackVal
+                        }).catch(() => {});
+                    } catch(e) {}
+                }
+
+                closeModal('modal-grading-eval');
+                renderGradingTable();
+                alert("Nilai dan catatan berhasil disimpan!");
+            }
+        }
+<!-- ... existing code ... timeline/submitStudentTaskAnswers -->
+        function submitStudentTaskAnswers() {
+            if (!currentSolvingTaskId || !currentUser || currentUser.role !== 'siswa') return;
+            const task = tasksStore.find(t => t.id === currentSolvingTaskId);
+            const student = currentUser.data;
+
+            const answers = [];
+            task.questions.forEach(q => {
+                let ansVal = '';
+                if (q.type === 'pg') {
+                    const checkedOption = document.querySelector(`input[name="answer_q_${q.id}"]:checked`);
+                    if (checkedOption) ansVal = checkedOption.value;
+                } else {
+                    const textOption = document.querySelector(`textarea[name="answer_q_${q.id}"]`);
+                    if (textOption) ansVal = textOption.value;
+                }
+
+                answers.push({
+                    questionId: q.id,
+                    questionText: q.text,
+                    studentAnswer: ansVal,
+                    correctKey: q.key || null
+                });
+            });
+
+            // Auto-grade PG Questions if applicable
+            let calculatedScore = null;
+            let autoGradable = task.questions.every(q => q.type === 'pg');
+            if (autoGradable) {
+                let correctCount = 0;
+                answers.forEach(a => {
+                    if (a.studentAnswer === a.correctKey) correctCount++;
+                });
+                calculatedScore = Math.round((correctCount / task.questions.length) * 100);
+            }
+
+            const newSubmission = {
+                id: 'sub-' + Date.now(),
+                taskId: task.id,
+                taskTitle: task.title,
+                subject: task.subject,
+                studentNisn: student.nisn,
+                studentName: student.name,
+                studentClass: student.class,
+                answers: answers,
+                score: calculatedScore,
+                teacherFeedback: autoGradable ? 'Dinilai Otomatis oleh Sistem (Pilihan Ganda)' : '',
+                parentComment: '',
+                submittedAt: new Date().toISOString()
+            };
+
+            submissionsStore.push(newSubmission);
+            saveSubsToLocal();
+
+            if (isCloudAvailable && db) {
+                try {
+                    db.collection('artifacts').doc('edutask-app').collection('public').doc('data').collection('submissions').doc(newSubmission.id).set(newSubmission).catch(() => {});
+                } catch(e) {}
+            }
+
+            clearInterval(countdownInterval);
+            closeModal('modal-task-solver');
+            renderSiswaDashboard();
+            alert("Tugas Anda berhasil dikirimkan!");
+        }
+
+        function viewStudentSubmission(subId) {
+            const sub = submissionsStore.find(s => s.id === subId);
+            if (!sub) return;
+
+            let text = `--- HASIL PENGERJAAN TUGAS ---\n`;
+            text += `Tugas: ${sub.taskTitle}\n`;
+            text += `Status Nilai: ${sub.score !== null ? sub.score + '/100' : 'Belum Dinilai'}\n`;
+            text += `Catatan Guru: ${sub.teacherFeedback || '-'}\n`;
+            text += `Komentar Ortu: ${sub.parentComment || '-'}\n`;
+
+            alert(text);
+        }
+
+        /* ==========================================================================
+           6. ORANG TUA CONTROLLER (VIEW CHILD PROGRESS & COMMENT)
+           ========================================================================== */
+
+        function renderOrtuDashboard() {
+            if (!currentUser || currentUser.role !== 'ortu') return;
+            const student = currentUser.data;
+
+            document.getElementById('ortu-child-name').textContent = `Anak: ${student.name} (${student.class})`;
+            document.getElementById('ortu-child-meta').textContent = `NISN: ${student.nisn} | SMPN 4 Satap Susukan`;
+
+            const childSubs = submissionsStore.filter(s => s.studentNisn === student.nisn);
+            const container = document.getElementById('ortu-reports-container');
+
+            if (childSubs.length === 0) {
+                container.innerHTML = `<div class="p-8 text-center text-slate-400 bg-slate-50 rounded-2xl border border-slate-200">Belum ada tugas yang diselesaikan oleh putra/putri Anda.</div>`;
+                return;
+            }
+
+            let html = '';
+            childSubs.forEach(sub => {
+                html += `
+                    <div class="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-brand-100 text-brand-800">${sub.subject}</span>
+                                <h4 class="font-bold text-slate-900 text-sm mt-1">${sub.taskTitle}</h4>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-xs text-slate-500 block">Nilai Guru:</span>
+                                <span class="text-lg font-bold text-purple-700">${sub.score !== null ? sub.score : 'Belum Dinilai'}</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-3 rounded-xl border border-slate-200 space-y-2 text-xs">
+                            <div>
+                                <span class="font-semibold text-slate-700 block">Catatan Evaluasi Guru:</span>
+                                <span class="text-slate-600 italic">${sub.teacherFeedback || 'Belum ada catatan.'}</span>
+                            </div>
+
+                            <div class="pt-2 border-t border-slate-100">
+                                <span class="font-semibold text-slate-700 block mb-1">Apresiasi / Komentar Orang Tua:</span>
+                                ${sub.parentComment ? `
+                                    <p class="text-emerald-700 font-medium bg-emerald-50 p-2 rounded-lg border border-emerald-200">${sub.parentComment}</p>
+                                ` : `
+                                    <div class="flex gap-2 mt-1">
+                                        <input type="text" id="ortu-comment-input-${sub.id}" placeholder="Tuliskan komentar apresiasi untuk anak Anda..." class="text-xs rounded-xl border-slate-300 py-1.5 px-3 w-full">
+                                        <button onclick="saveParentComment('${sub.id}')" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl text-xs shrink-0">Kirim</button>
+                                    </div>
+                                `}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function saveParentComment(subId) {
+            const input = document.getElementById(`ortu-comment-input-${subId}`);
+            if (!input || !input.value.trim()) return alert("Tuliskan komentar terlebih dahulu.");
+
+            const sub = submissionsStore.find(s => s.id === subId);
+            if (sub) {
+                sub.parentComment = input.value.trim();
+                saveSubsToLocal();
+
+                if (isCloudAvailable && db) {
+                    try {
+                        db.collection('artifacts').doc('edutask-app').collection('public').doc('data').collection('submissions').doc(sub.id).update({
+                            parentComment: sub.parentComment
+                        }).catch(() => {});
+                    } catch(e) {}
+                }
+
+                renderOrtuDashboard();
+                alert("Komentar Orang Tua berhasil disimpan!");
+            }
+        }
+
+        /* ==========================================================================
+           7. DIRECTORY & MODAL UTILITIES
+           ========================================================================== */
+
+        function renderStudentDirectory() {
+            const tbody = document.getElementById('directory-table-body');
+            const search = document.getElementById('directory-search').value.toLowerCase();
+            const filterClass = document.getElementById('directory-filter-class').value;
+
+            let filtered = ALL_STUDENTS;
+            if (filterClass !== 'ALL') filtered = filtered.filter(s => s.class === filterClass);
+            if (search) filtered = filtered.filter(s => s.name.toLowerCase().includes(search) || s.nisn.includes(search));
+
+            let html = '';
+            filtered.forEach(s => {
+                html += `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="py-2 px-3 font-mono text-slate-500">${s.nisn}</td>
+                        <td class="py-2 px-3 font-bold text-slate-800">${s.name}</td>
+                        <td class="py-2 px-3"><span class="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 font-semibold">${s.class}</span></td>
+                        <td class="py-2 px-3 font-mono text-slate-600">${s.userPass}</td>
+                        <td class="py-2 px-3 font-mono text-slate-600">${s.ortuPass}</td>
+                        <td class="py-2 px-3 text-right">
+                            <button onclick="quickLoginAsSiswa('${s.nisn}')" class="px-2 py-1 bg-brand-50 hover:bg-brand-100 text-brand-700 font-semibold rounded text-[11px] transition">
+                                Login Siswa
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+        }
+
+        function quickLoginAsSiswa(nisn) {
+            const student = ALL_STUDENTS.find(s => s.nisn === nisn);
+            if (student) {
+                currentUser = { role: 'siswa', data: student };
+                closeModal('modal-directory');
+                closeModal('modal-auth');
+                renderUserHeader();
+                showDashboardView('view-siswa');
+                renderSiswaDashboard();
+            }
+        }
+
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.remove('hidden');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        }
+
+        function toggleDirectoryModal() {
+            const modal = document.getElementById('modal-directory');
+            if (modal.classList.contains('hidden')) openModal('modal-directory');
+            else closeModal('modal-directory');
+        }
+
+        function resetDataDefault() {
+            if (confirm("Reset seluruh data demo ke kondisi awal?")) {
+                localStorage.removeItem('edutask_tasks_cloud');
+                localStorage.removeItem('edutask_subs_cloud');
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>
