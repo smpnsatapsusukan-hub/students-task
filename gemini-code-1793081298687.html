@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Ujian Online - SMPN 4 Satap Susukan</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #f4f7f6; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2, h3 { color: #2c3e50; text-align: center; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; }
+        button { background: #3498db; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; width: 100%; font-size: 16px; margin-top: 10px; }
+        button:hover { background: #2980b9; }
+        .btn-danger { background: #e74c3c; }
+        .btn-danger:hover { background: #c0392b; }
+        .card { background: #fafafa; border: 1px solid #eee; padding: 15px; margin-bottom: 15px; border-radius: 8px; }
+        .hidden { display: none; }
+        .score-badge { background: #2ecc71; color: white; padding: 5px 12px; border-radius: 20px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- 1. HALAMAN LOGIN -->
+    <div id="login-screen">
+        <h2>Login Aplikasi Ujian</h2>
+        <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="login-username" placeholder="Masukkan username">
+        </div>
+        <div class="form-group">
+            <label>Password (NISN / Pass Guru)</label>
+            <input type="password" id="login-password" placeholder="Masukkan password">
+        </div>
+        <button onclick="login()">Masuk</button>
+        <p id="login-error" style="color:red; text-align:center; margin-top:10px;"></p>
+    </div>
+
+    <!-- 2. DASHBOARD GURU -->
+    <div id="teacher-screen" class="hidden">
+        <h2>Panel Guru</h2>
+        <button class="btn-danger" onclick="logout()">Keluar</button>
+        <hr>
+        <h3>Buat Soal Baru</h3>
+        <div class="form-group">
+            <label>Pertanyaan Ujian</label>
+            <textarea id="question-text" rows="3" placeholder="Tuliskan soal..."></textarea>
+        </div>
+        <div class="form-group">
+            <label>Kunci Jawaban Singkat / Kata Kunci</label>
+            <input type="text" id="question-key" placeholder="Contoh: Jakarta">
+        </div>
+        <button onclick="addQuestion()">Tambah Soal</button>
+
+        <h3>Daftar Soal Aktif</h3>
+        <div id="teacher-questions-list"></div>
+
+        <h3>Hasil & Penilaian Siswa</h3>
+        <div id="teacher-results-list"></div>
+    </div>
+
+    <!-- 3. DASHBOARD SISWA -->
+    <div id="student-screen" class="hidden">
+        <h2>Portal Ujian Siswa</h2>
+        <p>Selamat Datang, <strong id="student-name"></strong> (Kelas <span id="student-class"></span>)</p>
+        <button class="btn-danger" onclick="logout()">Keluar</button>
+        <hr>
+
+        <div id="student-quiz-area">
+            <h3>Soal Ujian Anda</h3>
+            <div id="student-questions-container"></div>
+            <button onclick="submitExam()">Kirim Jawaban</button>
+        </div>
+
+        <div id="student-result-area" class="card hidden">
+            <h3>Hasil Ujian Anda</h3>
+            <p>Status: <strong>Selesai Mengerjakan</strong></p>
+            <p>Nilai Anda: <span id="student-score" class="score-badge">0</span> / 100</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Data Pengguna (Disadur dari Data Siswa SMPN 4 Satap Susukan)
+    const users = {
+        "guru": { pass: "admin123", name: "Budi Mulyono, S.Pd.", role: "teacher" },
+        "ajengayucand": { pass: "3143228981", name: "AJENG AYU CANDIKA", class: "7", role: "student" },
+        "andhikaevanb": { pass: "137128014", name: "ANDHIKA EVAN BAHTIAR", class: "7", role: "student" },
+        "afidkhomarud": { pass: "123037450", name: "AFID KHOMARUDIN", class: "8", role: "student" },
+        "adesaputra": { pass: "113773806", name: "ADE SAPUTRA", class: "9", role: "student" }
+        // ... Pengguna lainnya mengikuti format tabel di bawah
+    };
+
+    let currentUser = null;
+
+    function login() {
+        const u = document.getElementById('login-username').value.trim();
+        const p = document.getElementById('login-password').value.trim();
+        
+        if (users[u] && users[u].pass === p) {
+            currentUser = { username: u, ...users[u] };
+            document.getElementById('login-screen').classList.add('hidden');
+            
+            if (currentUser.role === 'teacher') {
+                document.getElementById('teacher-screen').classList.remove('hidden');
+                loadTeacherData();
+            } else {
+                document.getElementById('student-screen').classList.remove('hidden');
+                document.getElementById('student-name').innerText = currentUser.name;
+                document.getElementById('student-class').innerText = currentUser.class;
+                loadStudentQuiz();
+            }
+        } else {
+            document.getElementById('login-error').innerText = "Username atau Password salah!";
+        }
+    }
+
+    function logout() {
+        location.reload();
+    }
+
+    // Fungsi Guru
+    function addQuestion() {
+        const qText = document.getElementById('question-text').value;
+        const qKey = document.getElementById('question-key').value;
+        if (!qText) return alert("Soal tidak boleh kosong!");
+
+        let questions = JSON.parse(localStorage.getItem('exam_questions') || '[]');
+        questions.push({ id: Date.now(), question: qText, key: qKey });
+        localStorage.setItem('exam_questions', JSON.stringify(questions));
+        
+        document.getElementById('question-text').value = '';
+        document.getElementById('question-key').value = '';
+        loadTeacherData();
+    }
+
+    function loadTeacherData() {
+        let questions = JSON.parse(localStorage.getItem('exam_questions') || '[]');
+        let qContainer = document.getElementById('teacher-questions-list');
+        qContainer.innerHTML = questions.map((q, i) => `<div class="card"><b>Soal ${i+1}:</b> ${q.question}</div>`).join('');
+
+        let submissions = JSON.parse(localStorage.getItem('exam_submissions') || '{}');
+        let rContainer = document.getElementById('teacher-results-list');
+        let html = '';
+        for (let user in submissions) {
+            html += `<div class="card">
+                <strong>${users[user] ? users[user].name : user}</strong> - Nilai: <span class="score-badge">${submissions[user].score}</span>
+            </div>`;
+        }
+        rContainer.innerHTML = html || '<p>Belum ada siswa yang mengerjakan.</p>';
+    }
+
+    // Fungsi Siswa
+    function loadStudentQuiz() {
+        let submissions = JSON.parse(localStorage.getItem('exam_submissions') || '{}');
+        if (submissions[currentUser.username]) {
+            document.getElementById('student-quiz-area').classList.add('hidden');
+            document.getElementById('student-result-area').classList.remove('hidden');
+            document.getElementById('student-score').innerText = submissions[currentUser.username].score;
+            return;
+        }
+
+        let questions = JSON.parse(localStorage.getItem('exam_questions') || '[]');
+        let container = document.getElementById('student-questions-container');
+        if (questions.length === 0) {
+            container.innerHTML = '<p>Belum ada soal ujian dari guru.</p>';
+            return;
+        }
+
+        container.innerHTML = questions.map((q, i) => `
+            <div class="card">
+                <p><b>${i+1}. ${q.question}</b></p>
+                <input type="text" id="ans-${q.id}" placeholder="Ketik jawaban anda...">
+            </div>
+        `).join('');
+    }
+
+    function submitExam() {
+        let questions = JSON.parse(localStorage.getItem('exam_questions') || '[]');
+        let correctCount = 0;
+
+        questions.forEach(q => {
+            let ans = document.getElementById(`ans-${q.id}`).value.trim().toLowerCase();
+            if (ans === q.key.trim().toLowerCase()) {
+                correctCount++;
+            }
+        });
+
+        let finalScore = questions.length > 0 ? Math.round((correctCount / questions.length) * 100) : 0;
+        let submissions = JSON.parse(localStorage.getItem('exam_submissions') || '{}');
+        submissions[currentUser.username] = { score: finalScore, date: new Date().toISOString() };
+        localStorage.setItem('exam_submissions', JSON.stringify(submissions));
+
+        alert("Jawaban berhasil dikirim!");
+        loadStudentQuiz();
+    }
+</script>
+</body>
+</html>
